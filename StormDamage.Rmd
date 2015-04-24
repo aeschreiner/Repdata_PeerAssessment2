@@ -48,7 +48,7 @@ storms$END_DATE <- as.Date(storms$END_DATE,'%m/%d/%Y %H:%M:%S')
 fi <- storms %>%
     select(BGN_DATE,STATE,COUNTYNAME,EVTYPE,FATALITIES,INJURIES) %>%
     mutate(decade=floor(year(BGN_DATE)/10)*10) %>%
-    group_by(EVTYPE,STATE,decade) %>%
+    group_by(EVTYPE,decade,STATE) %>%
     summarize(nf=sum(FATALITIES),ni=sum(INJURIES))
 head(fi)
 ```
@@ -59,7 +59,7 @@ head(fi)
 dmg <- storms %>%
     select(BGN_DATE,STATE,COUNTYNAME,EVTYPE,PROPDMG,CROPDMG) %>%
     mutate(decade=floor(year(BGN_DATE)/10)*10) %>%
-    group_by(EVTYPE,STATE,decade) %>%
+    group_by(EVTYPE,decade,STATE) %>%
     summarize(pd=sum(PROPDMG),cd=sum(CROPDMG))
 head(dmg)
 ```
