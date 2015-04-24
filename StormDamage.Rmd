@@ -7,15 +7,16 @@
 
 ## Data Processing
 
-The data are read from the 'StormsData.csv' file. Column names are included n the file. Store data 'as-is', that is, do not do any implicit conversions, such as to factors.
+The data are read from the 'StormsData.csv' file. Column names are included n the file. Store data 'as-is', that is, do not do any implicit class conversions, such as to factors.
 
 ```{r load_data,message=FALSE}
 require(dplyr)
 require(ggplot2)
 require(lubridate)
+require(xtable)
 
 storms <- read.table('StormData.csv',header=TRUE,sep=',',na.strings='',
-                     ,as.is=TRUE,nrow=1000)
+                     ,as.is=TRUE,nrow=10000)
 ```
 
 Print the beginning of the data.
@@ -49,10 +50,18 @@ fi <- storms %>%
     select(BGN_DATE,STATE,COUNTYNAME,EVTYPE,FATALITIES,INJURIES) %>%
     mutate(decade=floor(year(BGN_DATE)/10)*10) %>%
     group_by(EVTYPE,decade,STATE) %>%
-    summarize(nf=sum(FATALITIES),ni=sum(INJURIES))
+    summarize(fatalities=sum(FATALITIES),injuries=sum(INJURIES))
 head(fi)
 ```
 
+```{r a1, results="asis"}
+sfidec <- fi %>% summarize(fatalities=sum(fatalities),injuries=sum(injuries))
+sfiall <- sfidec %>% summarize(fatalities=sum(fatalities),injuries=sum(injuries))
+
+table <- xtable(arrange(sfiall,desc(fatalities))[1:6,])
+print(table,type="html")
+```
+     
 ### Property and Crop Damage
 
 ```{r b}
