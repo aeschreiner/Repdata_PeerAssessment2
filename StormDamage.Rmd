@@ -24,13 +24,10 @@ Print the beginning of the data.
 head(storms)
 ```
 
-Many END_DATE entries are missing; if they are, then set them to the corresponding BGN_DATE. Then convert the begin date (BGN_DATE) and end date (END_DATE) fields to POSIXct class variables. It would be desirable to combine the DATE and TIME fields into a single field, but there are too many inconsistencies in the format of the time fields, and all this has not yet been investigated.
+Many END_DATE entries are missing; if they are, then set them to the corresponding BGN_DATE. Then convert the begin date (BGN_DATE) and end date (END_DATE) fields to POSIXct class variables. It would be desirable to combine the DATE and TIME fields into a single field, but there are too many inconsistencies in the format of the time fields, and all this has not yet been investigated. For now, the date is sufficient.
 
 ```{r convert_date}
-# the following simulates ifelse(!is.na(END_DATE),END_DATE,BGN_DATE) which doesn't work ?
-t <- storms$BGN_DATE
-t[!is.na(storms$END_DATE)] <- storms$END_DATE[!is.na(storms$END_DATE)]
-storms$END_DATE <- t
+storms$END_DATE <- ifelse(is.na(storms$END_DATE),storms$BGN_DATE,storms$END_DATE)
 
 storms$BGN_DATE <- as.Date(storms$BGN_DATE,'%m/%d/%Y %H:%M:%S')
 storms$END_DATE <- as.Date(storms$END_DATE,'%m/%d/%Y %H:%M:%S')
@@ -41,6 +38,28 @@ storms$END_DATE <- as.Date(storms$END_DATE,'%m/%d/%Y %H:%M:%S')
 #       hours=floor(as.numeric(storms$BGN_TIME)/100),
 #       minute=as.numeric(storms$BGN_TIME)%%100)
 
-
 ```
+
 ## Results
+
+### Injuries and Fatalities
+
+```{r a}
+fi <- storms %>%
+    select(BGN_DATE,STATE,COUNTYNAME,EVTYPE,FATALITIES,INJURIES) %>%
+    mutate(decade=floor(year(BGN_DATE)/10)*10) %>%
+    group_by(EVTYPE,STATE,decade) %>%
+    summarize(nf=sum(FATALITIES),ni=sum(INJURIES))
+head(fi)
+```
+
+### Property and Crop Damage
+
+```{r b}
+dmg <- storms %>%
+    select(BGN_DATE,STATE,COUNTYNAME,EVTYPE,PROPDMG,CROPDMG) %>%
+    mutate(decade=floor(year(BGN_DATE)/10)*10) %>%
+    group_by(EVTYPE,STATE,decade) %>%
+    summarize(pd=sum(PROPDMG),cd=sum(CROPDMG))
+head(dmg)
+```
