@@ -1,0 +1,46 @@
+# ->Analysis of Storm Damage<-
+# ->(Reproducible Research:  Peer Assessment 2)<-
+
+
+## Synopsis
+
+
+## Data Processing
+
+The data are read from the 'StormsData.csv' file. Column names are included n the file. Store data 'as-is', that is, do not do any implicit conversions, such as to factors.
+
+```{r load_data,message=FALSE}
+require(dplyr)
+require(ggplot2)
+require(lubridate)
+
+storms <- read.table('StormData.csv',header=TRUE,sep=',',na.strings='',
+                     ,as.is=TRUE,nrow=1000)
+```
+
+Print the beginning of the data.
+
+```{r print1}
+head(storms)
+```
+
+Many END_DATE entries are missing; if they are, then set them to the corresponding BGN_DATE. Then convert the begin date (BGN_DATE) and end date (END_DATE) fields to POSIXct class variables. It would be desirable to combine the DATE and TIME fields into a single field, but there are too many inconsistencies in the format of the time fields, and all this has not yet been investigated.
+
+```{r convert_date}
+# the following simulates ifelse(!is.na(END_DATE),END_DATE,BGN_DATE) which doesn't work ?
+t <- storms$BGN_DATE
+t[!is.na(storms$END_DATE)] <- storms$END_DATE[!is.na(storms$END_DATE)]
+storms$END_DATE <- t
+
+storms$BGN_DATE <- as.Date(storms$BGN_DATE,'%m/%d/%Y %H:%M:%S')
+storms$END_DATE <- as.Date(storms$END_DATE,'%m/%d/%Y %H:%M:%S')
+
+# would like to combine the start date and time, but there are too many
+#  inconstencies
+#update(storms$BGN_DATE,
+#       hours=floor(as.numeric(storms$BGN_TIME)/100),
+#       minute=as.numeric(storms$BGN_TIME)%%100)
+
+
+```
+## Results
