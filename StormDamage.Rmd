@@ -11,12 +11,10 @@ The data are read from the 'StormsData.csv' file. Column names are included n th
 
 ```{r load_data,message=FALSE}
 require(dplyr)
-require(ggplot2)
 require(lubridate)
-require(xtable)
 
 storms <- read.table('StormData.csv',header=TRUE,sep=',',na.strings='',
-                     ,as.is=TRUE,nrow=10000)
+                     ,as.is=TRUE)
 ```
 
 Print the beginning of the data.
@@ -25,41 +23,52 @@ Print the beginning of the data.
 head(storms)
 ```
 
-Many END_DATE entries are missing; if they are, then set them to the corresponding BGN_DATE. Then convert the begin date (BGN_DATE) and end date (END_DATE) fields to POSIXct class variables. It would be desirable to combine the DATE and TIME fields into a single field, but there are too many inconsistencies in the format of the time fields, and all this has not yet been investigated. For now, the date is sufficient.
+Many END_DATE entries are missing; if they are, then set them to the corresponding BGN_DATE. Then convert the begin date (BGN_DATE) and end date (END_DATE) fields to Date class variables. It would be desirable to combine the DATE and TIME fields into a single field, but there are too many inconsistencies in the format of the time fields, and all this has not yet been investigated. For now, the date is sufficient.
 
 ```{r convert_date}
 storms$END_DATE <- ifelse(is.na(storms$END_DATE),storms$BGN_DATE,storms$END_DATE)
 
-storms$BGN_DATE <- as.Date(storms$BGN_DATE,'%m/%d/%Y %H:%M:%S')
-storms$END_DATE <- as.Date(storms$END_DATE,'%m/%d/%Y %H:%M:%S')
-
-# would like to combine the start date and time, but there are too many
-#  inconstencies
-#update(storms$BGN_DATE,
-#       hours=floor(as.numeric(storms$BGN_TIME)/100),
-#       minute=as.numeric(storms$BGN_TIME)%%100)
-
+storms$BGN_DATE <- as.Date(storms$BGN_DATE,'%m/%d/%Y %H:%M:%S',tz=storms$TIME_ZONE)
+storms$END_DATE <- as.Date(storms$END_DATE,'%m/%d/%Y %H:%M:%S',tz=storms$TIME_ZONE)
 ```
+
+An examination of the EVTYPE fields shows that there is a lot of variety in the categorization of the events. For instance, thunderstorms appear under many labels, some of them are listed as follows
+
+```{r labels}
+evtlabels <- unique(storms$EVTYPE)
+tstormlabels <- evtlabels[grep('THU',evtlabels)]
+head(tstormlabels,n=15)
+```
+
+There needs to be considerable clean-up and consolidation of the data, but this will not be done in this document.
 
 ## Results
 
+We show some summaries of the impacts of these storm events; first looking at injuries and fatalities, and then property and crop damage.
+
 ### Injuries and Fatalities
+
+Let us investigate which type of event causes the most fatalities over all time periods.
 
 ```{r a}
 fi <- storms %>%
     select(BGN_DATE,STATE,COUNTYNAME,EVTYPE,FATALITIES,INJURIES) %>%
-    mutate(decade=floor(year(BGN_DATE)/10)*10) %>%
-    group_by(EVTYPE,decade,STATE) %>%
+#    mutate(decade=floor(year(BGN_DATE)/10)*10) %>%
+#    group_by(EVTYPE,decade) %>%
+    mutate(year=year(BGN_DATE)) %>%
+    group_by(EVTYPE,year) %>%
     summarize(fatalities=sum(FATALITIES),injuries=sum(INJURIES))
-head(fi)
+sfievt <- fi %>% summarize(fatalities=sum(fatalities),injuries=sum(injuries))
+
+arrange(sfievt,desc(fatalities))[1:10,]
 ```
 
-```{r a1, results="asis"}
-sfidec <- fi %>% summarize(fatalities=sum(fatalities),injuries=sum(injuries))
-sfiall <- sfidec %>% summarize(fatalities=sum(fatalities),injuries=sum(injuries))
+Plot the fatalities from tornadoes per year.
 
-table <- xtable(arrange(sfiall,desc(fatalities))[1:6,])
-print(table,type="html")
+```{r aplot}
+fitornado <- fi %>% filter(EVTYPE=='TORNADO')
+with(fitornado,
+     barplot(fatalities,names.arg=as.character(year)))
 ```
      
 ### Property and Crop Damage
@@ -68,7 +77,9 @@ print(table,type="html")
 dmg <- storms %>%
     select(BGN_DATE,STATE,COUNTYNAME,EVTYPE,PROPDMG,CROPDMG) %>%
     mutate(decade=floor(year(BGN_DATE)/10)*10) %>%
-    group_by(EVTYPE,decade,STATE) %>%
-    summarize(pd=sum(PROPDMG),cd=sum(CROPDMG))
-head(dmg)
-```
+    group_by(EVTYPE,decade) %>%
+    summarize(propdamage=sum(PROPDMG),cropdamage=sum(CROPDMG))
+sdmgevt <- dmg %>% summarize(propdamage=sum(propdamage),cropdamage=sum(cropdamage))
+
+arrange(sdmgevt,desc(propdamage))[1:10,]
+arrange(sdmgevt,desc(cropdamage))[1:10,]
