@@ -1,13 +1,12 @@
-# ->Analysis of Storm Damage<-
-# ->(Reproducible Research:  Peer Assessment 2)<-
-
+# Analysis of Storm Damage
 
 ## Synopsis
 
+We examine the U.S. National Oceanic and Atmospheric Administration's storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage. We make some conclusions about which type of weather event is most destructive in terms of human lives, and also in terms of monetary damage.
 
 ## Data Processing
 
-The data are read from the 'StormsData.csv' file. Column names are included n the file. Store data 'as-is', that is, do not do any implicit class conversions, such as to factors.
+The [Storm Database](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) is downloaded and stored in the compressed form as 'StormData.csv.bz2' and then read. The file is in the form of comma-separated variables and column names are included in the file. Data are loaded 'as-is', that is, no implicit class conversions are done, such as to factors.
 
 ```{r load_data,message=FALSE}
 require(dplyr)
@@ -26,10 +25,45 @@ head(storms)
 Many END_DATE entries are missing; if they are, then set them to the corresponding BGN_DATE. Then convert the begin date (BGN_DATE) and end date (END_DATE) fields to Date class variables. It would be desirable to combine the DATE and TIME fields into a single field, but there are too many inconsistencies in the format of the time fields, and all this has not yet been investigated. For now, the date is sufficient.
 
 ```{r convert_date}
-storms$END_DATE <- ifelse(is.na(storms$END_DATE),storms$BGN_DATE,storms$END_DATE)
+# clean up begin time
+h <- rep(0,nrow(storms))
+m <- rep(0,nrow(storms))
+i1 <- grep('AM|PM',storms$BGN_TIME,invert=TRUE)
+h[i1] <- floor(as.numeric(storms$BGN_TIME)/100)
+m[i1] <- as.numeric(storms$BGN_TIME) %% 100
+i2 <- grep('AM',storms$BGN_TIME)
+h[i2] <- as.numeric(substr(storms$BGN_TIME[i2],1,2))
+m[i2] <- as.numeric(substr(storms$BGN_TIME[i2],4,5))
+i3 <- grep('PM',storms$BGN_TIME)
+h[i3] <- as.numeric(substr(storms$BGN_TIME[i3],1,2)) + 12
+m[i3] <- as.numeric(substr(storms$BGN_TIME[i3],4,5))
 
-storms$BGN_DATE <- as.Date(storms$BGN_DATE,'%m/%d/%Y %H:%M:%S',tz=storms$TIME_ZONE)
-storms$END_DATE <- as.Date(storms$END_DATE,'%m/%d/%Y %H:%M:%S',tz=storms$TIME_ZONE)
+# clean up time zone information and use R recognized names
+tzone <- storms$TIME_ZONE
+tzone[tzone %in% c('EST','EDT','ESt','ESY')] <- 'US/Eastern'
+tzone[tzone %in% c('CST','CDT','CSt','CSC','SCT')] <- 'US/Central'
+tzone[tzone %in% c('MST','MDT')] <- 'US/Mountain'
+tzone[tzone %in% c('PST','PDT')] <- 'US/Pacific'
+tzone[tzone %in% c('AST','ADT','AKS')] <- 'US/Alaska'
+tzone[tzone %in% c('HST')] <- 'US/Hawaii'
+tzone[tzone %in% c('GST','SST')] <- 'Pacific/Guam'
+tzone[tzone %in% c('UTC','GMT','UNK')] <- 'UTC'
+unique(tzone)
+
+# convert to POSIXct class and add timezone
+#  cannot seem to do timezone without a loop
+storms$BGN_DATE <- as.POSIXct(storms$BGN_DATE,format='%m/%d/%Y')
+for (tz in unique(tzone)) {
+  storms$BGN_DATE[tzone==tz] <- update(storms$BGN_DATE[tzone==tz],tzs=tz)
+}
+
+# set missing end dates to corresponding begin dates
+storms$END_DATE <- ifelse(is.na(storms$END_DATE),storms$BGN_DATE,storms$END_DATE)
+storms$END_TIME <- ifelse(is.na(storms$END_TIME),storms$BGN_TIME,storms$END_TIME)
+
+storms$END_DATE <- as.POSIXct(storms$END_DATE,format='%m/%d/%Y')
+storms$BGN_DATE <- update(storms$BGN_DATE,hours=h,minutes=m)
+head(storms$BGN_DATE)
 ```
 
 An examination of the EVTYPE fields shows that there is a lot of variety in the categorization of the events. For instance, thunderstorms appear under many labels, some of them are listed as follows
@@ -53,8 +87,6 @@ Let us investigate which type of event causes the most fatalities over all time 
 ```{r a}
 fi <- storms %>%
     select(BGN_DATE,STATE,COUNTYNAME,EVTYPE,FATALITIES,INJURIES) %>%
-#    mutate(decade=floor(year(BGN_DATE)/10)*10) %>%
-#    group_by(EVTYPE,decade) %>%
     mutate(year=year(BGN_DATE)) %>%
     group_by(EVTYPE,year) %>%
     summarize(fatalities=sum(FATALITIES),injuries=sum(INJURIES))
@@ -68,18 +100,41 @@ Plot the fatalities from tornadoes per year.
 ```{r aplot}
 fitornado <- fi %>% filter(EVTYPE=='TORNADO')
 with(fitornado,
-     barplot(fatalities,names.arg=as.character(year)))
+     barplot(fatalities,names.arg=as.character(year),xlab='Year',ylab='Fatalities',
+     main='Fatalities from Tornadoes by Year'))
 ```
-     
+
+The number of fatalities from tornadoes reflects the fact that a small number of tornadoes are extremely destructive, but overall the death rate has not changed much over time.
+
 ### Property and Crop Damage
+
+Let us also examine which type of storm causes the most value damage, both for property and crops.
+
 
 ```{r b}
 dmg <- storms %>%
     select(BGN_DATE,STATE,COUNTYNAME,EVTYPE,PROPDMG,CROPDMG) %>%
-    mutate(decade=floor(year(BGN_DATE)/10)*10) %>%
-    group_by(EVTYPE,decade) %>%
+    mutate(year=year(BGN_DATE)) %>%
+    group_by(EVTYPE,year) %>%
     summarize(propdamage=sum(PROPDMG),cropdamage=sum(CROPDMG))
 sdmgevt <- dmg %>% summarize(propdamage=sum(propdamage),cropdamage=sum(cropdamage))
 
 arrange(sdmgevt,desc(propdamage))[1:10,]
 arrange(sdmgevt,desc(cropdamage))[1:10,]
+```
+
+It can be seen that tornadoes cause the most property damange, but hailstorm cause the most crop damage. Plot the variation in damage by year for both categories.
+
+```{r bplot}
+dmgtornado <- dmg %>% filter(EVTYPE=='TORNADO')
+with(dmgtornado,
+     barplot(propdamage,names.arg=as.character(year),xlab='Year',ylab='Property Damage',
+     main='Property Damage from Tornadoes by Year'))
+
+dmghail <- dmg %>% filter(EVTYPE=='HAIL')
+with(dmghail,
+     barplot(cropdamage,names.arg=as.character(year),xlab='Year',ylab='Crop Damage',
+     main='Crop Damage from Hail by Year'))
+```
+
+Property damage trends upward with time, presumable reflecting monetary inflation. Crop damage data appear not to have been included prior to 1992, so the trend is not so obvious.
